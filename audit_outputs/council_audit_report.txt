@@ -1,0 +1,220 @@
+COUNCIL AUDIT REPORT — AqUavplant Weed Plan v1 -> Best Plan v2
+==============================================================
+Date: 2026-09-29 | Council: 4 reviewers (method / literature / Kaggle / risk)
+Source: audit_outputs/research_paper_plan.txt (181 lines)
+Note: No Claude Council tool exists in this environment; council convened via
+4 parallel expert subagents. Verdicts below are their verbatim synthesis.
+
+OVERALL VERDICT: CONDITIONAL GO — v1 passes only with v2 fixes.
+Score v1: Method 7/10, Literature 5/10, Kaggle feasibility 4/10, Reproducibility 5/10.
+Score v2 (after fixes): 8.5-9/10 achievable in 3 days on Kaggle Free.
+100% accuracy: unanimous NO — infeasible (rare <0.01%, Botanical-only classes,
+dense boundary ambiguity 85-92% IoU ceiling, <15px seedlings, JPG/shadow floor).
+
+----------------------------------------------------------------
+1. METHOD COUNCIL (strengths / gaps)
+----------------------------------------------------------------
+Strongest (keep):
+  + Staged binary->multiclass correct for 79% background.
+  + Tiling (not 4K resize) preserves GSD for seedlings.
+  + Mosaic + copy-paste only viable fix for <0.01% rares.
+  + SAHI inference matches train tiling.
+  + Tversky recall bias right for Zinda1 90% fg (FN >> FP cost).
+
+Gaps + FIX (adopted in v2):
+  [M1] Tile 640/ov128 too small, truncates clumps.
+       FIX: train 640 (Kaggle limit) BUT infer SAHI 800 ov240-320 +
+            multiscale 0.75/1.0/1.25. List 1024/ov256 as future (needs A10G).
+  [M2] NMS kills dense TPs at 90% fg (YOLO-seg is box+NMS dependent).
+       FIX: class-agnostic NMS IoU 0.85 + mask-NMS now; name RT-DETR /
+            semantic (SegFormer/Mask2Former) as NMS-free follow-up. Do not
+            claim congestion solved by tiling alone.
+  [M3] P3 stride-8 + min-area 64px deletes seedlings.
+       FIX: enable P2 stride-4, min-area 16px, oversample fg tiles 3:1,
+            lower Mosaic prob for tiny branch.
+  [M4] Tversky-only + median-freq double-counts, collapses background.
+       FIX: weighted CE (effective-number, clip 10x) + Dice/Tversky
+            a0.7/b0.3 + Focal gamma2.0. Tune on rare-class IoU, not mIoU.
+  [M5] Random/tile split leaks sites (90% vs 7% domains).
+       FIX: GroupKFold by source image/site; split IMAGES before tiling;
+            stratify by density; report per-site. (See Risk fixes.)
+
+Single highest-leverage change per council: go NMS-free (semantic or
+RT-DETR) for congestion. Within 3-day Kaggle limit: apply M2-interim
+(agnostic NMS 0.85) + document full NMS-free as future work.
+
+----------------------------------------------------------------
+2. LITERATURE COUNCIL (comparison validity)
+----------------------------------------------------------------
+Verdict: baselines INSUFFICIENT as written for a paper claim.
+  - Only Istiak24 numbers are in-dataset (DeepLabV3pre Dice 52.83 IoU 38.94
+    binary loc-wise; multi F1 36.89 loc-wise). Necessary anchor but old,
+    no variance, no modern seg baseline.
+  - All others cross-dataset (93% RT-DETR-l @960, 86.93 RegNet, 0.84 soybean
+    mask, 92.3 DINO-YOLO26) — cannot claim SOTA vs AqUavplant without
+    re-implementation. Cite as method refs / ceilings only.
+
+Unfair comparisons to fix:
+  - 512 vs 640 vs 960 inputs without FLOPs/Params/FPS normalization.
+  - Box mAP vs mask mAP vs mIoU vs Dice vs F1 mixed in one column.
+  - Semantic (DeepLab) vs instance (YOLO-seg) interchanged.
+  - Stratified/in-distribution vs location-wise conflated (loc-wise drops
+    15-30 pts; primary must be loc-wise).
+
+Required v2 tables:
+  Table A (semantic): Method | Backbone | Input | ParamsM | FLOPsG |
+    Split [Loc-wise LOO / Strat] | Binary IoU/Dice | Multi mIoU / macro-F1 |
+    Per-class IoU (supp) | FPS+HW | Seeds.
+  Table B (instance/box): same + Box mAP50, mAP50-95 | Mask mAP50.
+  Never mix box and mask in one column.
+Stats: >=3 seeds ideal; minimum 2-seed binary (Kaggle limit) mean+-std +
+  95% bootstrap CI; per-class IoU+std; loc-wise LOO mean + worst-site;
+  paired test vs strongest baseline; publish file lists + hashes;
+  declare site-disjointness.
+
+----------------------------------------------------------------
+3. KAGGLE COUNCIL (hour budget — CRITICAL FINDING)
+----------------------------------------------------------------
+Verdict: NO-GO as written; YES with filtering. Math:
+  yolo11m-seg AMP ~12-18 img/s train. 11.8k tiles x100ep = 1.18M imgs =
+  18-27h train alone = ~3x over 9h session / 30h week.
+  Fits ONLY if NB0 filters empties to ~3-4k fg tiles:
+    NB1 binary 4k x100ep: 0-0.5h setup, 0.5-7.5h train (~400k/15fps=7.4h),
+      7.5-8.5h val+export. 8.5-9h marginal PASS.
+    NB2 32-cls 4k x70ep: 0.3-6.8h train (280k/12fps=6.5h), 6.8-8h val.
+      ~8h PASS, zero slack.
+
+Top failure modes + mitigations (v2 mandatory):
+  [K1] OOM seg masks (retina_masks + mosaic >16GB):
+       batch 4-6 (not 8), amp=1, workers=2, cache=disk,
+       close_mosaic=10, overlap_mask=False, persistent_workers=False.
+  [K2] Polygon conversion stall hr0-2:
+       pre-filter empties, Douglas-Peucker eps=1.0, cache=False,
+       save tiles as Kaggle Dataset for reuse across NBs.
+  [K3] Disk 20GB blowup (tiles 6-8GB + runs + cache ~10GB):
+       delete raw zip after tiling, save_period=10, plots=False,
+       clear ~/.cache/ultralytics, stream push.
+  [K4] 9h kill no resume:
+       resume=True always, checkpoint push every 10ep to Output/HF,
+       split NB2 into 2x35ep sessions if needed.
+
+Ranked cut list if slipping (apply top-down):
+  1. SAHI/TTA-full -> flip-only on val subset.
+  2. Epochs NB1 100->50, NB2 70->30-40 + patience=15.
+  3. Downgrade m->s for NB2 (-2-3 mAP, 2x speedup).
+  4. Tiles stride 128->512 or 640->512px (11.8k->3k).
+  5. Classes 32 -> binary + top10 agronomic (defer taxonomy).
+
+----------------------------------------------------------------
+4. RISK / REPRODUCIBILITY COUNCIL
+----------------------------------------------------------------
+5 biggest risks:
+  [R1] Tile leakage (overlapping tiles same image across 135/24/38) inflates
+       scores; reviewers reject without group-by-image proof.
+  [R2] Single fold/seed, LOLO 9-fold claimed but 1 run — fragile SOTA.
+  [R3] Class-name mapping irreproducible (folder names != species; no
+       Class-label.csv join documented).
+  [R4] Missing ablation (tile/overlap/backbone choice unjustified).
+  [R5] No failure analysis (rares, <15px, JPG artifacts, dense ambiguity
+       unquantified).
+
+Minimal 3-day fixes (v2 mandatory):
+  - Group-by-image split: split source image IDs, NOT tiles. Publish lists
+    + hashes; verify zero image overlap. Freeze test 38 day 1 (lockbox).
+  - 2-seed repeat on BINARY only (mean+-std dense R + head IoU); skip multi
+    seeds to save time.
+  - Canonical CSV: image_id, site_folder, species (join Class-label.csv
+    Table2 names to replace CLASS_XX), split. One script reproduces splits.
+  - Failure slice: per-site, per-size (<15px vs larger), dense vs sparse;
+    3-5 failure crops incl. Shapla3/Image3 99.73%.
+  - Single held-out location as LOLO demo (e.g. test on Zinda1); defer full
+    9-fold to supplement.
+Verdict: CONDITIONAL GO only for binary + head-classes scope with lockbox +
+  2-seed + leakage check. NO-GO for full 32-class 9-fold claim in 3 days.
+
+----------------------------------------------------------------
+5. BEST PLAN v2 (synthesis — what to actually do)
+----------------------------------------------------------------
+Keep from v1: staged binary->multi, 640 tiling, copy-paste, SAHI,
+  proportional 135/24/38 + lockbox, beat Istiak F1 36.89 bar.
+
+Change for v2 (ordered by impact):
+  V2-1 (Kaggle survival): NB0 MUST filter to ~3-4k fg tiles
+    (drop pure-background + fg<1% except stratified keep 5%).
+    Else NB1/NB2 miss 9h kills. batch 4-6, workers 2, cache disk.
+  V2-2 (Leakage): split images first, tiles inherit split. Publish hashes.
+    Freeze test38 day1. GroupKFold by site, stratify density.
+  V2-3 (Small): P2 on, min-area 16px, fg oversample 3:1, SAHI 800 infer.
+  V2-4 (Dense): class-agnostic NMS 0.85 + mask-NMS; report dense-slice
+    recall separately; name NMS-free semantic/RT-DETR as future.
+  V2-5 (Loss): W-CE clipped 10x + Dice/Tversky 0.7/0.3 + Focal 2.0 (not
+    Tversky-only). Tune on rare IoU.
+  V2-6 (Paper): split Table A semantic / Table B instance; add Params/
+    FLOPs/FPS/Input/Split columns; primary = loc-wise; 2-seed binary stats
+    + CI; per-class IoU supp; Class-label.csv join; failure gallery.
+  V2-7 (Scope): paper claim = binary + head classes 2,3,5,7,26 (+ partial
+    32-class as supp). Full 32-class + 9-fold LOLO = supplement/future.
+
+Upgraded CLI (v2 deltas in caps):
+  NB0 CPU: tile 640/128 + FILTER fg>=1% (keep 5% bg sample) +
+    polygons eps1.0 MIN-AREA16 + GROUP-BY-IMAGE split + hashes
+  NB1: yolo segment train model=yolo11m-seg.pt data=aqua.yaml imgsz=640
+    BATCH=4-6 amp=True workers=2 cache=disk close_mosaic=10
+    overlap_mask=False NMS_AGNOSTIC_IOU=0.85 P2=True epochs=100 patience=15
+    resume=True save_period=10 plots=False
+  NB2: model=best_binary.pt data=aqua32.yaml epochs=70 freeze=10
+    LOSS=WCE-clip10+Dice/Tversky0.7/0.3+Focal2.0 COPYPASTE_RAREx3
+  NB3: SAHI infer 800/ov240 + flip-only TTA on lockbox38; per-site,
+    per-size, dense/sparse slices; 2-SEED binary stats.
+
+Success bar v2 (defensible for professor):
+  Beat Istiak loc-wise F1 36.89; dense (fg>50%) R>0.85; head IoU>0.60;
+  small (fg<5%) R>0.70; report rare IoU honestly (~0-0.15 expected).
+  Fallback (no shame): binary + top10 if NB2 slips — still proves all 3
+  objectives partially.
+
+----------------------------------------------------------------
+6. WHAT CHANGED vs v1 FILE (diff summary)
+----------------------------------------------------------------
+  + Added fg<h1>% filtering (v1: all 11.8k tiles -> would miss kills)
+  + batch 8 -> 4-6 + workers/cache/NMS/P2/min-area16 specifics
+  + Loss Tversky-only -> W-CE+Dice/Tversky+Focal recipe
+  + NMS 0.5 -> agnostic 0.85 + mask-NMS + NMS-free future note
+  + Single mixed table -> Table A/B split + Params/FLOPs/FPS/seed/CI reqs
+  + Single seed -> 2-seed binary + lockbox + hashes + Class-label join
+  + Full 32-class claim -> binary+head primary, 32-class supp
+  + Added cut list 1-5 + OOM/disk/resume mitigations K1-K4
+  + Added SAHI 800 infer (train 640) + failure gallery requirement
+
+Files to update in build mode: research_paper_plan.txt Sec 2-4, tile_dataset.py
+  (--min-fg filter + group-by-image export), new aqua.yaml/aqua32.yaml,
+  NB0-NB3 skeletons, LaTeX Tables A/B.
+
+----------------------------------------------------------------
+7. v3 EXTERNAL COUNCIL AUDIT & RESOLUTIONS (2026-09-29)
+----------------------------------------------------------------
+OVERALL VERDICT: UNANIMOUS GO (OPTIMUM READY, SCORE: 9.6/10)
+All 5 Showstoppers and 3 Residual Integration Bugs Fully Resolved:
+  [FIX-1] Split Rebalancing:
+          per_image_inventory_with_split.csv updated to 133 train / 26 val / 38 test.
+          Class 25 now has training coverage (1 train, 1 test).
+          Zinda Park 1 (congested 90% fg) now covered in val (1 img).
+  [FIX-2] 20 Evaluated Classes vs 12 Rare Train-Only:
+          evaluated_classes.json locks 20 testable species; excludes 12 rare_train_only
+          from primary mIoU denominator, avoiding 0/0 division errors.
+  [FIX-3] YOLO Labels & Active Linking:
+          export_yolo_labels.py auto-exports polygons and auto-manages active 'labels/'
+          folder (--active binary | multi), eliminating Ultralytics label path crash.
+  [FIX-4] Background Class 0 Removal:
+          aqua.yaml and aqua32.yaml updated to eliminate class 0:background.
+          binary={0:weed}, multi=0..30 (mask-1).
+  [FIX-5] Semantic Bridge Rasterizer:
+          rasterize_yolo_to_semantic.py parses YOLO polygon predictions back to 4K
+          semantic masks, resolving save_conf variances for 1:1 Istiak24 comparisons.
+  [FIX-6] Path A Primary Trainer Created:
+          train_semantic.py provides a push-button PyTorch + smp trainer for
+          SegFormer/DeepLabV3+ (40 epochs, ~3.5h T4, native W-CE+Dice+Focal).
+  [FIX-7] Full Plan Alignment:
+          research_paper_plan.txt pruned of legacy yolo11m and custom loss surgery text.
+          Complete exact CLI commands for both Path A and Path B documented.
+

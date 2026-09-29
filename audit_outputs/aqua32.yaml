@@ -1,0 +1,53 @@
+# AqUavplant MULTICLASS seg — Ultralytics format (v3 FIXED)
+# Tiles: audit_outputs/tiles/t640_o128_minfg0.01_bg0.05/{images}
+# Labels: .../labels_multi/*.txt (from export_yolo_labels.py)
+# v3 FIX: YOLO ids are 0..30 = mask ids 1..31 MINUS 1. Mask 0 (background,
+# 79.28% of pixels) is unannotated negative, never a target. v2's
+# `0: background ... 31: CLASS_31` (32 ids) was WRONG and would crash/misalign.
+# Warm-start from best binary weights (staged). Paper metric on EVALUATED
+# classes only (see evaluated_classes.json: 20 classes with train+test
+# coverage); 12 rare_train_only classes reported separately, excluded from mean.
+path: tiles/t640_o128_minfg0.01_bg0.05
+train: tile_lists/train.txt
+val: tile_lists/val.txt
+test: tile_lists/test.txt
+names:
+  0: Water_Iris
+  1: Keshordam
+  2: Lily_Pad
+  3: Water_Mimosa
+  4: Sacred_Lotus
+  5: Water_Poppy
+  6: Arrowhead
+  7: Water_Lettuce
+  8: Water_Velvet
+  9: Hornwort
+  10: Tape_Grass
+  11: Hydrilla
+  12: Water_Cabbage
+  13: Water_Clover
+  14: Pickerelweed
+  15: Coontail
+  16: Water_Star_grass
+  17: Umbrella_Plant
+  18: Alligator_Weed
+  19: Water_Primrose
+  20: Floating_Heart
+  21: Broadleaf_Pondweed
+  22: Common_Duckweed
+  23: Giant_Salvinia
+  24: Water_Fern
+  25: Water_Spinach
+  26: Water_Hyacinth
+  27: Bulrush_Reed
+  28: Cape_Blue_Lily
+  29: Water_Snowflake
+  30: Water_Chestnut
+# Ground truth mask ID = YOLO ID + 1 (Mask 0 = unannotated background).
+# Evaluated classes (20 testable species): 0,1,2,3,4,5,6,8,12,18,19,21,23,24,25,26,28,29,30 (YOLO ids).
+# Rare train-only (12 species excluded from mean mIoU): 7,9,10,11,13,14,15,16,17,20,22,27 (YOLO ids).
+# Train (Ultralytics BCEcls only — NO custom loss possible; use cls weights via
+# `cls` gain + oversampling rares x3 in exporter/mosaic instead):
+# yolo segment train model=best_binary.pt data=aqua32.yaml imgsz=640 batch=8 epochs=40 freeze=10 patience=12 optimizer=AdamW amp=True workers=2 cache=disk copy_paste=0.5 resume=True save_period=10 plots=False
+# Rasterize preds -> semantic PNGs for Dice/mIoU vs Istiak24:
+# python rasterize_yolo_to_semantic.py --pred runs/segment/predict/labels --tiles tiles/t640_o128_minfg0.01_bg0.05 --out pred_semantic

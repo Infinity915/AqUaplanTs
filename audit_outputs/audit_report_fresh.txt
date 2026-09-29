@@ -1,0 +1,69 @@
+FRESH FULL AUDIT REPORT — AqUavplant dataset + plan artifacts
+=============================================================
+Date: 2026-09-29 (re-audit; supersedes earlier dataset audit + optimum_rate_audit)
+Method: re-executed from scratch (inventory, md5, headers, pixel scan, split/yaml/script checks)
+Dataset root: D:\AqUavplant (audit_outputs/ excluded from data counts)
+
+A. DATASET INVENTORY (re-verified)
+----------------------------------
+Total data files: 591 = 197 JPG + 394 PNG | 497,380,451 bytes (474.34 MB)
+Per site (folders / jpg=bin=multi / numbering / gaps / bad-folders):
+  BAU Botanical Garden: 56 / 56=56=56 / 1-56 / gaps [] / bad 0
+  BAU Museum:           23 / 23=23=23 / 1-23 / gaps [] / bad 0
+  Shapla Bil 1:         35 / 35=35=35 / 1-35 / gaps [] / bad 0
+  Shapla Bil 2:         15 / 15=15=15 / 1-15 / gaps [] / bad 0
+  Shapla Bil 3:         26 / 26=26=26 / 1-26 / gaps [] / bad 0
+  Shapla Bil 4:         25 / 25=25=25 / 1-25 / gaps [] / bad 0
+  Zinda Park 1:          6 / 6=6=6   / 1-6  / gaps [] / bad 0
+  Zinda Park 2:          6 / 6=6=6   / 1-6  / gaps [] / bad 0
+  Zinda Park 3:          5 / 5=5=5   / 1-5  / gaps [] / bad 0
+Every leaf folder holds exactly 3 files (ImageN.jpg + Image_N_binaryMask.png +
+Image_N_multiclassMask.png). Numbering dense, zero gaps, zero orphans.
+
+B. TECHNICAL (re-verified by pixel scan)
+----------------------------------------
+All 591 images open, 0 unreadable. Uniform 3840x2160 (4K, 8.29 MP).
+Modes: JPG=RGB (197), PNG=L 8-bit grayscale (394).
+Binary values exactly {0,1}; multiclass exactly {0..31} (32 classes).
+Triplet size mismatches: 0. Binary vs (multiclass>0) inconsistent: 0/197.
+Foreground coverage (binary fg %, min/max/mean/med):
+  Botanical 1.61/45.98/17.81/17.14 | Museum 12.54/59.35/40.69/40.10
+  Shapla1 2.68/39.01/11.42/9.50 | Shapla2 1.09/14.22/7.77/7.57
+  Shapla3 1.71/99.74/16.23/14.40 | Shapla4 4.65/25.29/13.35/9.36
+  Zinda1 76.80/96.43/90.25/95.18 | Zinda2 12.10/85.10/50.53/56.23
+  Zinda3 1.68/20.92/6.54/2.02
+Outliers (>90% or <2%): Botanical 50/51; Shapla2 3/4; Shapla3 21 + 3 (99.74%,
+near-full — inspect); Zinda1 1/2/5/6; Zinda3 1/3. No 0% / 100% masks.
+Global pixel histogram (1,633,996,800 px): bg 0 = 79.275%; head 3 = 5.605%,
+5 = 5.435%, 7 = 5.236%, 2 = 0.652%, 26 = 0.630%; sub-0.01% classes: 11, 16,
+21, 23, 30, 31. Dataset unchanged since first audit (same numbers).
+EXIF stripped (JFIF only). No camera/GPS metadata.
+
+C. INTEGRITY (re-verified)
+--------------------------
+md5 over all 591 files: 0 byte-identical duplicates (basename repeats across
+sites are intentional, content-distinct). Basename collisions expected
+(Image1 x9 etc.), not duplicates.
+
+D. PLAN ARTIFACTS (re-verified just now)
+----------------------------------------
+Split v3: CSV==JSON id-identical, train 133 / val 26 / test 38.
+All 9 sites have val coverage (Zinda blindspot fixed).
+evaluated_classes.json matches recompute: 20 evaluated / 12 rare_train_only / 0 untrainable.
+aqua.yaml: 1 id {0:weed}, no background class. aqua32.yaml: 31 ids 0..30
+(= mask 1..31 minus 1). Both correct (v2 blunders fixed).
+tile_dataset.py v2 flags present (--min-fg/--bg-keep/--split-csv/leakage_ok/meta).
+export_yolo_labels.py: findContours + remap v-1 present.
+rasterize_yolo_to_semantic.py: inverse remap yid+1 present.
+All scripts compile (tile/export/rasterize/sem_spec). Plan file is v3 (36,710 chars).
+Artifact dir now 21 files; new since last audit: class_labels.csv,
+sem_train.py, train_semantic.py (added by parallel session — not validated here).
+
+E. OPTIMUM-RATE RE-SCORE
+------------------------
+Data integrity & splits 9.5 | Label pipeline 8.5 | Model/loss 8.0 |
+Kaggle feasibility 8.5 | Paper comparability 8.0 => OVERALL 8.6/10 (unchanged).
+Unchanged because remaining 1.4 pts are runtime unknowns (exporter end-to-end,
+T4 throughput, baseline rerun, species-name join) — none closable without a
+Kaggle GPU run. No regressions found; no new blockers; v3 fixes all hold.
+GO for NB0+NB1. Re-rate after NB1 measured throughput (target >=9.0).

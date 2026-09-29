@@ -1,0 +1,33 @@
+class_id,yolo_id,common_name,scientific_name,status,evaluated
+0,-1,Background,None,background,False
+1,0,Water Iris,Iris pseudacorus,native,True
+2,1,Keshordam,Ludwigia adscendens,indigenous,True
+3,2,Lily Pad,Nymphaea spp.,indigenous,True
+4,3,Water Mimosa,Neptunia oleracea,indigenous,True
+5,4,Sacred Lotus,Nelumbo nucifera,indigenous,True
+6,5,Water Poppy,Hydrocleys nymphoides,invasive,True
+7,6,Arrowhead,Sagittaria sagittifolia,indigenous,True
+8,7,Water Lettuce,Pistia stratiotes,invasive,False
+9,8,Water Velvet,Azolla pinnata,indigenous,True
+10,9,Hornwort,Ceratophyllum demersum,indigenous,False
+11,10,Tape Grass,Vallisneria spiralis,indigenous,False
+12,11,Hydrilla,Hydrilla verticillata,invasive,False
+13,12,Water Cabbage,Limnocharis flava,invasive,True
+14,13,Water Clover,Marsilea quadrifolia,indigenous,False
+15,14,Pickerelweed,Pontederia cordata,invasive,False
+16,15,Coontail,Ceratophyllum echinatum,indigenous,False
+17,16,Water Star-grass,Heteranthera dubia,invasive,False
+18,17,Umbrella Plant,Cyperus alternifolius,indigenous,False
+19,18,Alligator Weed,Alternanthera philoxeroides,invasive,True
+20,19,Water Primrose,Ludwigia octovalvis,indigenous,True
+21,20,Floating Heart,Nymphoides hydrophylla,indigenous,False
+22,21,Broadleaf Pondweed,Potamogeton natans,indigenous,True
+23,22,Common Duckweed,Lemna minor,indigenous,False
+24,23,Giant Salvinia,Salvinia molesta,invasive,True
+25,24,Water Fern,Salvinia cucullata,indigenous,True
+26,25,Water Spinach,Ipomoea aquatica,indigenous,True
+27,26,Water Hyacinth,Eichhornia crassipes,invasive,True
+28,27,Bulrush Reed,Typha domingensis,indigenous,False
+29,28,Cape Blue Lily,Nymphaea capensis,indigenous,True
+30,29,Water Snowflake,Nymphoides indica,indigenous,True
+31,30,Water Chestnut,Trapa natans,indigenous,True

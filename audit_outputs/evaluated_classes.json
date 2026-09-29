@@ -1,0 +1,42 @@
+{
+  "rule": "evaluated = train>=1 image AND test>=1 image; rare_train_only = train-only (report separately, exclude from mean); untrainable must be empty",
+  "evaluated_classes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    9,
+    13,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    29,
+    30,
+    31
+  ],
+  "n_evaluated": 20,
+  "rare_train_only": [
+    8,
+    10,
+    11,
+    12,
+    14,
+    15,
+    16,
+    17,
+    18,
+    21,
+    23,
+    28
+  ],
+  "untrainable": [],
+  "note": "Single-image classes (18, 23) can never be in both train and test; they stay rare_train_only by design, same as Istiak24."
+}

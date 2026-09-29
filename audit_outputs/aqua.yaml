@@ -1,0 +1,14 @@
+# AqUavplant BINARY seg — Ultralytics format (v3 FIXED)
+# Tiles: audit_outputs/tiles/t640_o128_minfg0.01_bg0.05/{images}
+# Labels: .../labels_binary/*.txt  (from export_yolo_labels.py)
+# v3 FIX: background is NOT a class in YOLO. Only weed is annotated (id 0);
+# mask 0 pixels are unannotated negatives. v2's `0: background, 1: weed` was WRONG.
+path: tiles/t640_o128_minfg0.01_bg0.05
+train: tile_lists/train.txt
+val: tile_lists/val.txt
+test: tile_lists/test.txt
+names:
+  0: weed
+# Train (Kaggle T4 16GB, 9h-safe — use yolo11s-seg for 3-day budget, m if VRAM allows):
+# yolo segment train model=yolo11s-seg.pt data=aqua.yaml imgsz=640 batch=8 epochs=45 patience=12 optimizer=AdamW amp=True workers=2 cache=disk mosaic=0.8 close_mosaic=10 copy_paste=0.3 overlap_mask=False resume=True save_period=10 plots=False
+# Predict: yolo segment predict source=images imgsz=800 conf=0.25 iou=0.85 agnostic_nms=True retina_masks=True
