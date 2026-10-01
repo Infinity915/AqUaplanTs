@@ -16,9 +16,48 @@ import argparse, csv, json, hashlib, random
 from pathlib import Path
 from PIL import Image
 
-ROOT = Path(r"D:\AqUavplant")
+def find_project_root():
+    # 1. Local Windows path (original)
+    p = Path(r"D:\AqUavplant")
+    if (p / "audit_outputs" / "per_image_inventory_with_split.csv").exists():
+        return p
+    # 2. Kaggle Dataset mount (e.g. /kaggle/input/<slug>/audit_outputs/...)
+    for cand in [Path("/kaggle/input"), Path("/kaggle/working"), Path.cwd()]:
+        if not cand.exists():
+            continue
+        # direct hit
+        if (cand / "audit_outputs" / "per_image_inventory_with_split.csv").exists():
+            return cand
+        # nested one level (dataset slug folder)
+        try:
+            for sub in cand.iterdir():
+                if sub.is_dir() and (sub / "audit_outputs" / "per_image_inventory_with_split.csv").exists():
+                    return sub
+        except Exception:
+            pass
+    # 3. Fallback: script location parents
+    cur = Path(__file__).resolve()
+    for parent in [cur.parent, cur.parent.parent, Path.cwd()]:
+        if (parent / "audit_outputs" / "per_image_inventory_with_split.csv").exists():
+            return parent
+        if parent.name == "audit_outputs" and (parent / "per_image_inventory_with_split.csv").exists():
+            return parent.parent
+    return Path.cwd()
+
+ROOT = find_project_root()
 AUDIT = ROOT / "audit_outputs"
-OUT_ROOT_DEFAULT = AUDIT / "tiles"
+# Writable output: /kaggle/working on Kaggle, else ./tiles locally.
+# (Never write into /kaggle/input — it is read-only.)
+try:
+    _INPUT_MARKER = str(ROOT).startswith("/kaggle/input")
+except Exception:
+    _INPUT_MARKER = False
+if Path("/kaggle/working").exists():
+    OUT_ROOT_DEFAULT = Path("/kaggle/working") / "tiles"
+elif _INPUT_MARKER:
+    OUT_ROOT_DEFAULT = Path.cwd() / "tiles"
+else:
+    OUT_ROOT_DEFAULT = AUDIT / "tiles"
 
 def sha1_of_file(p, n=65536):
     h = hashlib.sha1()
@@ -44,15 +83,34 @@ def main():
     ap.add_argument("--split-csv", type=str,
                     default="per_image_inventory_with_split.csv",
                     help="CSV with image_id->split column (group-by-image, leakage fix).")
+    ap.add_argument("--data-root", type=str, default=None,
+                    help="Root directory containing raw dataset images. Defaults to auto-detected ROOT.")
     ap.add_argument("--out", type=str, default=str(OUT_ROOT_DEFAULT))
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--format", type=str, default="png", choices=["png", "jpg"])
     args = ap.parse_args()
     random.seed(args.seed)
 
-    inv_path = AUDIT / args.split_csv
-    if not inv_path.exists():  # fallback to base inventory (split=unknown)
-        inv_path = AUDIT / "per_image_inventory.csv"
+    data_root = Path(args.data_root) if args.data_root else ROOT
+
+    # Robust split_csv resolution across various CWDs and prefixes
+    cand_csvs = [
+        Path(args.split_csv),
+        ROOT / args.split_csv,
+        AUDIT / args.split_csv,
+        AUDIT / Path(args.split_csv).name,
+        ROOT / "audit_outputs" / Path(args.split_csv).name,
+        AUDIT / "per_image_inventory.csv",
+        ROOT / "audit_outputs" / "per_image_inventory.csv"
+    ]
+    inv_path = None
+    for cand in cand_csvs:
+        if cand.exists():
+            inv_path = cand
+            break
+    if inv_path is None:
+        raise FileNotFoundError(f"Could not find split inventory CSV at any candidate location. Tried: {cand_csvs}")
+
     inv = list(csv.DictReader(open(inv_path)))
     if args.limit:
         inv = inv[:args.limit]
@@ -66,7 +124,10 @@ def main():
     kept_rows, bg_pool = [], []
     n_tiles_total = 0
     for r in inv:
-        jpg = ROOT / r["jpg"]; b = ROOT / r["binaryMask"]; m = ROOT / r["multiclassMask"]
+        # Cross-platform path separator normalization (Windows \ -> Linux /)
+        jpg = data_root / Path(r["jpg"].replace("\\", "/"))
+        b = data_root / Path(r["binaryMask"].replace("\\", "/"))
+        m = data_root / Path(r["multiclassMask"].replace("\\", "/"))
         im_j = Image.open(jpg); im_b = Image.open(b); im_m = Image.open(m)
         W, H = im_j.size
         base = r["image_id"].replace("/", "_").replace(" ", "_")
